@@ -2,10 +2,10 @@ from NGramProcessor import *
 
 
 df_train = pd.read_csv('dataset/train_dataset.csv')
-df_train.dropna(inplace=True)
+# df_train.dropna(inplace=True)
 
 df_test = pd.read_csv('dataset/validate_dataset.csv')
-df_test.dropna(inplace=True)
+# df_test.dropna(inplace=True)
 
 
 unigram = NGramProcessor(df_train, df_test, 1)
