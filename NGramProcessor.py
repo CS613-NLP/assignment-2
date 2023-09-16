@@ -100,7 +100,7 @@ class NGramProcessor:
                     probability_dict[key] = 0
 
         df = pd.DataFrame(list(probability_dict.items()), columns=['Comment', 'Probability'])
-        
+
         df.to_csv(save_csv, index=False)
         print(f'Saved {self.n}-gram probabilities to {save_csv}')
         return df
@@ -135,6 +135,8 @@ class NGramProcessor:
                 # probability_dict[key] = (0 if not bool(frequency_dict_n_1.get(key_n_1)) else (frequency_dict[key] if bool(frequency_dict.get(key)) else 0) / frequency_dict_n_1[key_n_1])
         
         df = pd.DataFrame(columns=['Comment', 'Perplexity'])
+        avg_perplexity = 0
+        count_sentences = 0
         for idx, row in tqdm(self.df_test.iterrows(), total=self.df_test.shape[0], desc=f'Calculating perplexity for {self.n}-grams'):
             sentences = self.make_sentences(row['Processed_Comment'])
             perplexity = 0
@@ -148,6 +150,12 @@ class NGramProcessor:
             
             # df.at[idx, 'Perplexity'] = perplexity/len(sentences)
             df.loc[idx] = [row['Processed_Comment'], perplexity/len(sentences)]
+            avg_perplexity += perplexity
+            count_sentences += len(sentences)
+        avg_perplexity /= count_sentences
+        print(f'Average perplexity for {self.n}-grams: {avg_perplexity}')
+        perp_df = pd.read_csv('avg_perplexity.csv').loc[self.n-1, 'Average Perplexity'] = avg_perplexity
+        perp_df.to_csv('avg_perplexity.csv', index=False)
 
         df.to_csv(save_csv, index=False)
         print(f'Saved {self.n}-gram perplexities to {save_csv}')
