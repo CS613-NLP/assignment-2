@@ -1,5 +1,7 @@
 from NGramProcessor import *
+import os
 
+os.makedirs('language_models', exist_ok=True)
 
 df_train = pd.read_csv('dataset/train_dataset.csv')
 # df_train.dropna(inplace=True)
@@ -8,20 +10,24 @@ df_test = pd.read_csv('dataset/validate_dataset.csv')
 # df_test.dropna(inplace=True)
 
 
-unigram = NGramProcessor(df_train, df_train, 1)
+unigram = NGramProcessor(df_train, 1)
+unigram.train()
 unigram.find_probability(save_csv='language_models/unigram.csv')
-unigram.calc_perplexity(save_csv='language_models/unigram_val.csv')
+unigram.calc_perplexity(df_train, save_csv='language_models/unigram_val.csv')
 
 
-bigram = NGramProcessor(df_train, df_train, 2)
+bigram = NGramProcessor(df_train, 2)
+bigram.train()
 bigram.find_probability(save_csv='language_models/bigram.csv')
-bigram.calc_perplexity(save_csv='language_models/bigram_val.csv')
+bigram.calc_perplexity(df_train, save_csv='language_models/bigram_val.csv')
 
-trigram = NGramProcessor(df_train, df_test, 3)
+trigram = NGramProcessor(df_train, 3)
+trigram.train()
 trigram.find_probability(save_csv='language_models/trigram.csv')
-trigram.find_probability(save_csv='language_models/trigram_val.csv')
+trigram.calc_perplexity(df_train, save_csv='language_models/trigram_val.csv')
 
 
-quadgram = NGramProcessor(df_train, df_test, 4)
+quadgram = NGramProcessor(df_train, 4)
+quadgram.train()
 quadgram.find_probability(save_csv='language_models/quadgram.csv')
-quadgram.find_probability(save_csv='language_models/quadgram_val.csv')
+quadgram.calc_perplexity(df_train, save_csv='language_models/quadgram_val.csv')

@@ -2,40 +2,28 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 from tqdm import tqdm 
-import re
+import multiprocessing
+from joblib import Parallel, delayed
+
+tqdm.pandas()
 
 class NGramProcessor:
     """
     This class is used to create n-gram language models
     """    
-    def __init__(self, df_train, df_test, n=1):
+    def __init__(self, df_train, n=1):
         """
 
         Args:
             df_train (pd.DataFrame): Preprocessed training dataset
             df_test (pd.DataFrame): Preprocessed validation dataset
             ngram (int, optional): Value of n for the n-gram. Defaults to 1.
-        """        
-        self.df_train = df_train
-        self.df_test = df_test
+        """
         self.n = n
+        self.df_train = df_train
         pass
 
-    def make_sentences(self, comment):
-        """Function to create a sentence from a comment
-
-        Args:
-            comment (str): Comment to create a sentence from
-
-        Returns:
-            list: list of sentences
-        """        
-        pattern = r'<s> <s> <s>(.*?)</s> </s> </s>'
-        sentences = re.findall(pattern, comment, re.DOTALL)
-        sentences = ['<s> <s> <s> ' + sentence.strip() + ' </s> </s> </s>' for sentence in sentences]
-        return sentences
-
-    def ngrams(self, df, n=1, startIdx=0):
+    def ngrams(self, comment, n=1):
         """Function to create n-grams from a dataset
 
         Args:
@@ -44,17 +32,11 @@ class NGramProcessor:
 
         Returns:
             list: list of n-grams
-        """        
-        ngrams_corpus = []
-        for _, row in tqdm(df.iterrows(), total=df.shape[0], desc=f'Creating {n}-grams'):
-            sentences = self.make_sentences(row['Processed_Comment'])
-            for sentence in sentences:
-                words = sentence.split(" ")
-                ngrams_sentence = [' '.join(words[i:i + n]) for i in range(startIdx, len(words) - n - 1)]
-                ngrams_corpus.extend(ngrams_sentence)
-        return ngrams_corpus
+        """
+        words = comment.split(" ")
+        return [' '.join(words[i:i + n]) for i in range(4-self.n, len(words) - n - 1)]
 
-    def create_frequency_dict(self, n, startIdx=0):
+    def create_frequency_dict(self, n):
         """Function to create a frequency dictionary for n-grams
 
         Args:
@@ -62,51 +44,73 @@ class NGramProcessor:
 
         Returns:
             Dict: Dictionary of n-grams and their frequencies
-        """        
-        ngrams = self.ngrams(self.df_train, n, startIdx)
+        """
+        # ngrams = self.ngrams(self.df_train, n, startIdx)
+        ngrams_series = self.df_train['Sentences'].progress_apply(self.ngrams, args=(n,))
+        ngrams = ngrams_series.explode().tolist()
         frequency_dict = defaultdict(int)
         
         for item in tqdm(ngrams, desc=f'Creating frequency dictionary for {n}-grams'):
             frequency_dict[item] += 1
-            # if item in frequency_dict:
-            #     frequency_dict[item] += 1
-            # else:
-            #     frequency_dict[item] = 1
+
         return frequency_dict
+    
+    def train(self):
+        """Function to train the model
+        """
+        self.frequency_dict = self.create_frequency_dict(self.n)
+        if(self.n != 1):
+            self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
+
+    def compute_log_probability(self, key):
+        if self.n == 1:
+            return key, np.log2(self.frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+        else:
+            key_n_1 = ' '.join(key.split()[:self.n - 1])
+            if bool(self.frequency_dict_n_1.get(key_n_1)):
+                return key, np.log2(self.frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+            else:
+                return key, 0
 
     def find_probability(self, save_csv='sample.csv'):
-        """Function to find the probability of n-grams
+        """Function to find the log probability of n-grams
 
         Args:
             save_csv (str, optional): Path to save the csv file. Defaults to 'sample.csv'.
 
         Returns:
-            pd.DataFrame: Dataframe containing the n-grams and their probabilities
-        """        
-        if(self.n != 1):
-            frequency_dict_n_1 = self.create_frequency_dict(self.n-1, 4-self.n)
-        frequency_dict = self.create_frequency_dict(self.n, 4-self.n)
-        probability_dict = {}
+            pd.DataFrame: Dataframe containing the n-grams and their log probabilities
+        """
+        keys = list(self.frequency_dict.keys())
 
-        # if train:
-        for key in tqdm(frequency_dict.keys(), desc=f'Finding probability for {self.n}-grams'):
-            if self.n == 1:
-                probability_dict[key] = frequency_dict[key] / sum(frequency_dict.values())
-            else:
-                key_n_1 = ' '.join(key.split()[:self.n - 1])
-                if bool(frequency_dict_n_1.get(key_n_1)):
-                    probability_dict[key] = frequency_dict[key] / frequency_dict_n_1[key_n_1] 
-                else:
-                    probability_dict[key] = 0
+        # num_cores = multiprocessing.cpu_count()
+        # probability_results = Parallel(n_jobs=num_cores)(
+        #     delayed(self.compute_log_probability)(key) for key in tqdm(keys, desc=f'Finding log probability for {self.n}-grams')
+        # )
 
-        df = pd.DataFrame(list(probability_dict.items()), columns=['Comment', 'Probability'])
+        # log_probability_dict = dict(probability_results)
+
+        probability_results = []
+        for key in tqdm(keys, desc=f'Finding log probability for {self.n}-grams'):
+            probability_results.append(self.compute_log_probability(key))
+
+        log_probability_dict = dict(probability_results)
+
+        df = pd.DataFrame(list(log_probability_dict.items()), columns=['Comment', 'Probability'])
 
         df.to_csv(save_csv, index=False)
         print(f'Saved {self.n}-gram probabilities to {save_csv}')
         return df
 
+    def calculate_sentence_perplexity(self, sentence, log_probability_dict):
+        ngrams_of_sentence = self.ngrams(sentence, self.n)
+        total_log_prob = 0
+        for ngram_set in ngrams_of_sentence:
+            total_log_prob += log_probability_dict[ngram_set]
+        perplexity = 2 ** (-total_log_prob / len(ngrams_of_sentence))
+        return perplexity
     
-    def calc_perplexity(self, save_csv='sample.csv'):
+    def calc_perplexity(self, df_test, save_csv='sample.csv'):
         """Function to find the probability of n-grams
 
         Args:
@@ -116,45 +120,40 @@ class NGramProcessor:
             pd.DataFrame: Dataframe containing the n-grams and their probabilities
         """
         
-        if(self.n != 1):
-            frequency_dict_n_1 = self.create_frequency_dict(self.n-1, 4-self.n)
-        frequency_dict = self.create_frequency_dict(self.n, 4-self.n)
-        probability_dict = {}
+        ngrams_series = df_test['Sentences'].progress_apply(self.ngrams, args=(self.n,))
+        ngrams = ngrams_series.explode().tolist()
 
-        ngram = self.ngrams(self.df_test, self.n)
-        for key in list(set(ngram)):
-            if self.n == 1:
-                probability_dict[key] = frequency_dict[key] / sum(frequency_dict.values())
+        # num_cores = multiprocessing.cpu_count()
+        # probability_results = Parallel(n_jobs=num_cores)(
+        #     delayed(self.compute_probability)(key) for key in tqdm(list(set(ngrams)), desc=f'Finding probability for {self.n}-grams')
+        # )
 
-            else:
-                key_n_1 = ' '.join(key.split()[:self.n - 1])
-                if bool(frequency_dict_n_1.get(key_n_1)):
-                    probability_dict[key] = frequency_dict[key] / frequency_dict_n_1[key_n_1]
-                else:
-                    probability_dict[key] = 0
-                # probability_dict[key] = (0 if not bool(frequency_dict_n_1.get(key_n_1)) else (frequency_dict[key] if bool(frequency_dict.get(key)) else 0) / frequency_dict_n_1[key_n_1])
+        probability_results = []
+        for key in tqdm(list(set(ngrams)), desc=f'Finding log probability for {self.n}-grams'):
+            probability_results.append(self.compute_log_probability(key))
         
-        df = pd.DataFrame(columns=['Comment', 'Perplexity'])
-        avg_perplexity = 0
-        count_sentences = 0
-        for idx, row in tqdm(self.df_test.iterrows(), total=self.df_test.shape[0], desc=f'Calculating perplexity for {self.n}-grams'):
-            sentences = self.make_sentences(row['Processed_Comment'])
-            perplexity = 0
-            for sentence in sentences:
-                words = sentence.split(" ")
-                ngrams_sentence = [' '.join(words[i:i + self.n]) for i in range(4-self.n, len(words) - self.n - 1)]
-                total_log_prob = 0
-                for ngram_set in ngrams_sentence:
-                    total_log_prob += np.log2(probability_dict[ngram_set])
-                perplexity += 2 ** (-total_log_prob / len(ngrams_sentence))
-            
-            # df.at[idx, 'Perplexity'] = perplexity/len(sentences)
-            df.loc[idx] = [row['Processed_Comment'], perplexity/len(sentences)]
-            avg_perplexity += perplexity
-            count_sentences += len(sentences)
-        avg_perplexity /= count_sentences
+        log_probability_dict = dict(probability_results)
+
+        # probability_dict[key] = (0 if not bool(frequency_dict_n_1.get(key_n_1)) else (frequency_dict[key] if bool(frequency_dict.get(key)) else 0) / frequency_dict_n_1[key_n_1])
+        
+        sentences = df_test['Sentences'].tolist()
+
+        # num_cores = multiprocessing.cpu_count()
+        # perplexity_scores = Parallel(n_jobs=num_cores)(
+        #     delayed(self.calculate_sentence_perplexity)(sentence, log_probability_dict) 
+        #     for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams')
+        # )
+
+        perplexity_scores = []
+        for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams'):
+            perplexity_scores.append(self.calculate_sentence_perplexity(sentence, log_probability_dict))
+
+        df = pd.DataFrame({'Comment': sentences, 'Perplexity': perplexity_scores})
+        avg_perplexity = np.mean(perplexity_scores)
+
         print(f'Average perplexity for {self.n}-grams: {avg_perplexity}')
-        perp_df = pd.read_csv('avg_perplexity.csv').loc[self.n-1, 'Average Perplexity'] = avg_perplexity
+        perp_df = pd.read_csv('avg_perplexity.csv')
+        perp_df.loc[self.n-1, 'Average Perplexity'] = avg_perplexity
         perp_df.to_csv('avg_perplexity.csv', index=False)
 
         df.to_csv(save_csv, index=False)

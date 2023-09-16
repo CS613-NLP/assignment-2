@@ -1,5 +1,5 @@
-N-gram	Average Perplexity
-Unigram	
-Bigram	
-Trigram	
-Quadgram	
+N-gram	Average Perplexity,Average Perplexity
+Unigram	,3127.774485380327
+Bigram	,119.706003065104
+Trigram	,22.028366695992307
+Quadgram	,13.168770756178716
