@@ -2,7 +2,7 @@ import pandas as pd
 
 # splitting the data into train and validate sets in the ratio 80:20
 
-data = pd.read_csv('dataset/processed_dataset.csv')
+data = pd.read_csv('dataset/sentences.csv')
 
 data = data.sample(frac=1, random_state=42)
 

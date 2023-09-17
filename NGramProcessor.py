@@ -75,23 +75,33 @@ class NGramProcessor:
     def compute_log_probability(self, key, smoothing=None):
 
         if smoothing=="laplace" or smoothing=="additive":
-            updated_frequency_dict = self.laplace_frequency_dict
-            unseen_words_probability = self.unseen_probability
-        elif smoothing is None:
-            updated_frequency_dict = self.frequency_dict
-            unseen_words_probability = 0
+            if self.n == 1:
+                if bool(self.laplace_frequency_dict.get(key)):
+                    return key, np.log2(self.laplace_frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+                else:
+                    return key, self.unseen_probability
+            else:
+                key_n_1 = ' '.join(key.split()[:self.n - 1])
+                if bool(self.frequency_dict_n_1.get(key_n_1)):
+                    if bool(self.laplace_frequency_dict.get(key)):
+                        return key, np.log2(self.laplace_frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                    else:
+                        return key, np.log2(self.k) - np.log2(self.frequency_dict_n_1[key_n_1] + self.k*self.vocab_size)
+                else:
+                    return key, np.log2(self.k) - np.log2(self.k*self.vocab_size)
 
-        if self.n == 1:
-            if bool(updated_frequency_dict.get(key)):
-                return key, np.log2(updated_frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+        elif smoothing is None:
+            if self.n == 1:
+                if bool(self.frequency_dict.get(key)):
+                    return key, np.log2(self.frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+                else:
+                    return key, -np.inf
             else:
-                return key, unseen_words_probability
-        else:
-            key_n_1 = ' '.join(key.split()[:self.n - 1])
-            if bool(self.frequency_dict_n_1.get(key_n_1)) and bool(updated_frequency_dict.get(key)):
-                return key, np.log2(updated_frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
-            else:
-                return key, unseen_words_probability
+                key_n_1 = ' '.join(key.split()[:self.n - 1])
+                if bool(self.frequency_dict.get(key)):
+                    return key, np.log2(self.frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                else:
+                    return key, -np.inf
 
 
     def find_probability(self, save_csv='sample.csv'):
@@ -146,6 +156,7 @@ class NGramProcessor:
             self.ngrams, args=(self.n,))
         ngrams = ngrams_series.explode().tolist()
 
+        self.k = k
         # num_cores = multiprocessing.cpu_count()
         # probability_results = Parallel(n_jobs=num_cores)(
         #     delayed(self.compute_probability)(key) for key in tqdm(list(set(ngrams)), desc=f'Finding probability for {self.n}-grams')
@@ -263,9 +274,9 @@ class NGramProcessor:
                 self.laplace_frequency_dict[key] = ((self.frequency_dict[key] + k*1)*self.frequency_dict_n_1[key_n_1])/ (self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
         if self.n == 1:
-            self.unseen_probability = np.log2(k*1) - np.log2(N + k*self.vocab_size)
+            self.unseen_probability = np.log2(k) - np.log2(N + k*self.vocab_size)
         else:
-            self.unseen_probability = np.log2(k*1) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
+            self.unseen_probability = np.log2(k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
 
     def __get_vocab_size(self):
@@ -275,4 +286,5 @@ class NGramProcessor:
             for word in words:
                 words_set.add(word)
 
+        self.vocab_size = len(words_set)-2
         return len(words_set)-2
