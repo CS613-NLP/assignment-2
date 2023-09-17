@@ -1,5 +1,5 @@
 n,Average Perplexity
 Unigram,2144.920675509809
-Bigram,0.0
-Trigram,0.0
-Quadgram,0.0
+Bigram,344.327578437473
+Trigram,466.39798523802966
+Quadgram,592.3719864318357
