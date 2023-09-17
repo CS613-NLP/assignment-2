@@ -74,7 +74,7 @@ class NGramProcessor:
 
     def compute_log_probability(self, key, smoothing=None):
 
-        if smoothing=="laplace" or smoothing=="additive":
+        if smoothing == "laplace" or smoothing == "additive":
             if self.n == 1:
                 if bool(self.laplace_frequency_dict.get(key)):
                     return key, np.log2(self.laplace_frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
@@ -90,6 +90,24 @@ class NGramProcessor:
                 else:
                     return key, np.log2(self.k) - np.log2(self.k*self.vocab_size)
 
+
+        elif smoothing == "turing":
+            updated_frequency_dict = self.turing_frequency_dict
+            unseen_words_probability = np.log2(
+                self.frequency_of_frequency[1] / self.frequency_dict_size)
+
+            if self.n == 1:
+                if bool(updated_frequency_dict.get(key)):
+                    return key, np.log2(updated_frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+                else:
+                    return key, unseen_words_probability
+            else:
+                key_n_1 = ' '.join(key.split()[:self.n - 1])
+                if bool(updated_frequency_dict.get(key)):
+                    return key, np.log2(updated_frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                else:
+                    return key, unseen_words_probability
+
         elif smoothing is None:
             if self.n == 1:
                 if bool(self.frequency_dict.get(key)):
@@ -103,7 +121,6 @@ class NGramProcessor:
                 else:
                     return key, -np.inf
 
-
     def find_probability(self, save_csv='sample.csv'):
         """Function to find the log probability of n-grams
 
@@ -114,13 +131,6 @@ class NGramProcessor:
             pd.DataFrame: Dataframe containing the n-grams and their log probabilities
         """
         keys = list(self.frequency_dict.keys())
-
-        # num_cores = multiprocessing.cpu_count()
-        # probability_results = Parallel(n_jobs=num_cores)(
-        #     delayed(self.compute_log_probability)(key) for key in tqdm(keys, desc=f'Finding log probability for {self.n}-grams')
-        # )
-
-        # log_probability_dict = dict(probability_results)
 
         probability_results = []
         for key in tqdm(keys, desc=f'Finding log probability for {self.n}-grams'):
@@ -157,10 +167,6 @@ class NGramProcessor:
         ngrams = ngrams_series.explode().tolist()
 
         self.k = k
-        # num_cores = multiprocessing.cpu_count()
-        # probability_results = Parallel(n_jobs=num_cores)(
-        #     delayed(self.compute_probability)(key) for key in tqdm(list(set(ngrams)), desc=f'Finding probability for {self.n}-grams')
-        # )
 
         probability_results = []
 
@@ -173,35 +179,20 @@ class NGramProcessor:
         elif smoothing is None:
             log_prob_save_csv = None
 
-        # def process(key):
-        #     return self.compute_log_probability(key, smoothing=smoothing)
-
         for key in tqdm(list(set(ngrams)), desc=f'Finding log probability for {self.n}-grams with {smoothing} smoothing'):
             probability_results.append(
                 self.compute_log_probability(key, smoothing=smoothing))
-
-        # results = Parallel(n_jobs=8)(delayed(process)(key) for key in tqdm(list(set(
-        #     ngrams)), desc=f'Finding log probability for {self.n}-grams with {smoothing} smoothing'))
-
-        # probability_results = results
 
         log_probability_dict = dict(probability_results)
 
         # save the log probability dict
         if log_prob_save_csv is not None:
-            df = pd.DataFrame(list(log_probability_dict.items()), columns=['Comment', 'Log Probability'])
+            df = pd.DataFrame(list(log_probability_dict.items()), columns=[
+                              'Comment', 'Log Probability'])
             df.to_csv(log_prob_save_csv, index=False)
             print(f'Saved {self.n}-gram probabilities to {log_prob_save_csv}')
 
-        # probability_dict[key] = (0 if not bool(frequency_dict_n_1.get(key_n_1)) else (frequency_dict[key] if bool(frequency_dict.get(key)) else 0) / frequency_dict_n_1[key_n_1])
-
         sentences = df_test['Sentences'].tolist()
-
-        # num_cores = multiprocessing.cpu_count()
-        # perplexity_scores = Parallel(n_jobs=num_cores)(
-        #     delayed(self.calculate_sentence_perplexity)(sentence, log_probability_dict)
-        #     for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams')
-        # )
 
         perplexity_scores = []
         for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams'):
@@ -233,7 +224,7 @@ class NGramProcessor:
 
     def __populate_turning(self):
         self.frequency_of_frequency = {}
-        
+
         for key in self.frequency_dict.keys():
             if self.frequency_dict[key] not in self.frequency_of_frequency:
                 self.frequency_of_frequency[self.frequency_dict[key]] = 1
@@ -268,10 +259,12 @@ class NGramProcessor:
         # if train:
         for key in tqdm(self.frequency_dict.keys(), desc=f'Finding probability for {self.n}-grams'):
             if self.n == 1:
-                self.laplace_frequency_dict[key] = ((self.frequency_dict[key] + k*1)*N)/ (N + k*self.vocab_size)
+                self.laplace_frequency_dict[key] = (
+                    (self.frequency_dict[key] + k*1)*N) / (N + k*self.vocab_size)
             else:
                 key_n_1 = ' '.join(key.split()[:self.n - 1])
-                self.laplace_frequency_dict[key] = ((self.frequency_dict[key] + k*1)*self.frequency_dict_n_1[key_n_1])/ (self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
+                self.laplace_frequency_dict[key] = ((self.frequency_dict[key] + k*1)*self.frequency_dict_n_1[key_n_1]) / (
+                    self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
         if self.n == 1:
             self.unseen_probability = np.log2(k) - np.log2(N + k*self.vocab_size)
