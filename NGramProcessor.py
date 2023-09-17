@@ -16,7 +16,6 @@ class NGramProcessor:
 
         Args:
             df_train (pd.DataFrame): Preprocessed training dataset
-            df_test (pd.DataFrame): Preprocessed validation dataset
             ngram (int, optional): Value of n for the n-gram. Defaults to 1.
         """
         self.n = n
@@ -24,14 +23,14 @@ class NGramProcessor:
         pass
 
     def ngrams(self, comment, n=1):
-        """Function to create n-grams from a dataset
+        """Function to create n-grams from a comment
 
         Args:
-            df (pd.DataFrame): Preprocessed dataset to create n-grams from
+            comment (str): Comment from the dataset
             n (int, optional): Value of n for the n-gram. Defaults to 1.
 
         Returns:
-            list: list of n-grams
+            List: List of n-grams from the comment
         """
         words = comment.split(" ")
         return [' '.join(words[i:i + n]) for i in range(4-self.n, len(words) - n - 1)]
@@ -56,13 +55,21 @@ class NGramProcessor:
         return frequency_dict
     
     def train(self):
-        """Function to train the model
+        """Function to train the n-gram model
         """
         self.frequency_dict = self.create_frequency_dict(self.n)
         if(self.n != 1):
             self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
 
     def compute_log_probability(self, key):
+        """Function to compute the log probability of an n-gram
+
+        Args:
+            key (str): n-gram
+
+        Returns:
+            Tuple: Tuple containing the n-gram and its log probability
+        """
         if self.n == 1:
             return key, np.log2(self.frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
         else:
