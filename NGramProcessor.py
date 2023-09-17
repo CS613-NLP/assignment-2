@@ -174,6 +174,14 @@ class NGramProcessor:
         ngrams = ngrams_series.explode().tolist()
 
         self.k = k
+        save_csv_dir_path = save_csv[:-len(save_csv.split('/')[-1])-1]
+        if save_csv_dir_path != '':
+            os.makedirs(save_csv_dir_path, exist_ok=True)
+
+        # num_cores = multiprocessing.cpu_count()
+        # probability_results = Parallel(n_jobs=num_cores)(
+        #     delayed(self.compute_probability)(key) for key in tqdm(list(set(ngrams)), desc=f'Finding probability for {self.n}-grams')
+        # )
 
         probability_results = []
 
@@ -194,8 +202,10 @@ class NGramProcessor:
 
         # save the log probability dict
         if log_prob_save_csv is not None:
-            df = pd.DataFrame(list(log_probability_dict.items()), columns=[
-                              'Comment', 'Log Probability'])
+            log_prob_save_csv_dir_path = log_prob_save_csv[:-len(log_prob_save_csv.split('/')[-1])-1]
+            if log_prob_save_csv_dir_path != '':
+                os.makedirs(log_prob_save_csv_dir_path, exist_ok=True)
+            df = pd.DataFrame(list(log_probability_dict.items()), columns=['Comment', 'Log Probability'])
             df.to_csv(log_prob_save_csv, index=False)
             print(f'Saved {self.n}-gram probabilities to {log_prob_save_csv}')
 
@@ -213,7 +223,12 @@ class NGramProcessor:
         print(
             f'Average perplexity for {self.n}-grams: {avg_perplexity} with {smoothing} smoothing')
 
-        avg_file = f'avg_perplexity_{smoothing}_smoothing.csv'
+
+        if df_test.equals(self.df_train):
+            avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_train.csv'
+        else:
+            avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_test.csv'
+
         # if avg file does not exist, create it
         if not os.path.exists(avg_file):
             temp_df = pd.DataFrame(

@@ -2,7 +2,7 @@ from NGramProcessor import *
 import os
 
 os.makedirs('language_models', exist_ok=True)
-os.makedirs('language_models/laplace', exist_ok=True)
+# os.makedirs('language_models/laplace', exist_ok=True)
 
 df_train = pd.read_csv('dataset/train_dataset.csv')
 
