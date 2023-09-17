@@ -1,16 +1,17 @@
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from tqdm import tqdm 
-import multiprocessing
+from tqdm import tqdm
 from joblib import Parallel, delayed
 
 tqdm.pandas()
 
+
 class NGramProcessor:
     """
     This class is used to create n-gram language models
-    """    
+    """
+
     def __init__(self, df_train, n=1):
         """
 
@@ -46,31 +47,97 @@ class NGramProcessor:
             Dict: Dictionary of n-grams and their frequencies
         """
         # ngrams = self.ngrams(self.df_train, n, startIdx)
-        ngrams_series = self.df_train['Sentences'].progress_apply(self.ngrams, args=(n,))
+        ngrams_series = self.df_train['Sentences'].progress_apply(
+            self.ngrams, args=(n,))
         ngrams = ngrams_series.explode().tolist()
         frequency_dict = defaultdict(int)
-        
+
         for item in tqdm(ngrams, desc=f'Creating frequency dictionary for {n}-grams'):
             frequency_dict[item] += 1
 
         return frequency_dict
-    
+
     def train(self):
         """Function to train the model
         """
+        self.vocab_size = self.__get_vocab_size()
         self.frequency_dict = self.create_frequency_dict(self.n)
+        self.frequency_dict_size = sum(self.frequency_dict.values())
         if(self.n != 1):
             self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
 
-    def compute_log_probability(self, key):
-        if self.n == 1:
-            return key, np.log2(self.frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
-        else:
-            key_n_1 = ' '.join(key.split()[:self.n - 1])
-            if bool(self.frequency_dict_n_1.get(key_n_1)):
-                return key, np.log2(self.frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+    def compute_log_probability(self, key, flag_smooth="none"):
+        if flag_smooth == "none":
+            if self.n == 1:
+                return key, np.log2(self.frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
             else:
-                return key, 0
+                key_n_1 = ' '.join(key.split()[:self.n - 1])
+                if bool(self.frequency_dict_n_1.get(key_n_1)):
+                    return key, np.log2(self.frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                else:
+                    return key, 0
+        elif flag_smooth == "turing":
+
+            frequency_of_frequency = {}
+
+            # def process_frequency_of_frequency(key):
+            #     if self.frequency_dict[key] not in frequency_of_frequency:
+            #         frequency_of_frequency[self.frequency_dict[key]] = 1
+            #     else:
+            #         frequency_of_frequency[self.frequency_dict[key]] += 1
+
+            for key in self.frequency_dict.keys():
+                if self.frequency_dict[key] not in frequency_of_frequency:
+                    frequency_of_frequency[self.frequency_dict[key]] = 1
+                else:
+                    frequency_of_frequency[self.frequency_dict[key]] += 1
+
+            # r = Parallel(n_jobs=2)(delayed(process_frequency_of_frequency)(key)
+            #                        for key in self.frequency_dict.keys())
+
+            # We need to find the frequency of frequency of 0
+            frequency_of_frequency[0] = (
+                self.vocab_size ** (self.n)) - len(self.frequency_dict.keys())
+
+            updated_frequency_dict = {}
+
+            # def process_update_frequency(key):
+            #     count = self.frequency_dict[key]
+            #     freq_count = frequency_of_frequency[count]
+
+            #     if count + 1 in frequency_of_frequency:
+            #         freq_count_plus = frequency_of_frequency[count + 1]
+            #     else:
+            #         freq_count_plus = 0
+
+            #     updated_frequency_dict[key] = (
+            #         (count + 1) * freq_count_plus) / freq_count
+
+            # Make the updated frequency dictionary
+
+            for key in self.frequency_dict.keys():
+                count = self.frequency_dict[key]
+                freq_count = frequency_of_frequency[count]
+
+                if count + 1 in frequency_of_frequency:
+                    freq_count_plus = frequency_of_frequency[count + 1]
+                else:
+                    freq_count_plus = 0
+
+                updated_frequency_dict[key] = (
+                    (count + 1) * freq_count_plus) / freq_count
+
+            # r = Parallel(n_jobs=2)(delayed(process_update_frequency)(key)
+            #                        for key in self.frequency_dict.keys())
+
+            if self.n == 1:
+                return key, np.log2(updated_frequency_dict[key]) - np.log2(self.frequency_dict_size)
+            else:
+                key_n_1 = ' '.join(key.split()[:self.n - 1])
+                if bool(self.frequency_dict_n_1.get(key_n_1)):
+                    return key, np.log2(updated_frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                else:
+                    return key, 0
 
     def find_probability(self, save_csv='sample.csv'):
         """Function to find the log probability of n-grams
@@ -96,7 +163,8 @@ class NGramProcessor:
 
         log_probability_dict = dict(probability_results)
 
-        df = pd.DataFrame(list(log_probability_dict.items()), columns=['Comment', 'Probability'])
+        df = pd.DataFrame(list(log_probability_dict.items()),
+                          columns=['Comment', 'Probability'])
 
         df.to_csv(save_csv, index=False)
         print(f'Saved {self.n}-gram probabilities to {save_csv}')
@@ -109,8 +177,8 @@ class NGramProcessor:
             total_log_prob += log_probability_dict[ngram_set]
         perplexity = 2 ** (-total_log_prob / len(ngrams_of_sentence))
         return perplexity
-    
-    def calc_perplexity(self, df_test, save_csv='sample.csv'):
+
+    def calc_perplexity(self, df_test, flag_smooth="none", save_csv='sample.csv'):
         """Function to find the probability of n-grams
 
         Args:
@@ -119,8 +187,8 @@ class NGramProcessor:
         Returns:
             pd.DataFrame: Dataframe containing the n-grams and their probabilities
         """
-        
-        ngrams_series = df_test['Sentences'].progress_apply(self.ngrams, args=(self.n,))
+        ngrams_series = df_test['Sentences'].progress_apply(
+            self.ngrams, args=(self.n,))
         ngrams = ngrams_series.explode().tolist()
 
         # num_cores = multiprocessing.cpu_count()
@@ -129,33 +197,87 @@ class NGramProcessor:
         # )
 
         probability_results = []
-        for key in tqdm(list(set(ngrams)), desc=f'Finding log probability for {self.n}-grams'):
-            probability_results.append(self.compute_log_probability(key))
-        
+
+        if flag_smooth == "turing":
+            self.__populate_turning()
+
+        # def process(key):
+        #     return self.compute_log_probability(key, flag_smooth=flag_smooth)
+
+        for key in tqdm(list(set(ngrams)), desc=f'Finding log probability for {self.n}-grams with {flag_smooth} smoothing'):
+            probability_results.append(
+                self.compute_log_probability(key, flag_smooth=flag_smooth))
+
+        # results = Parallel(n_jobs=8)(delayed(process)(key) for key in tqdm(list(set(
+        #     ngrams)), desc=f'Finding log probability for {self.n}-grams with {flag_smooth} smoothing'))
+
+        # probability_results = results
+
         log_probability_dict = dict(probability_results)
 
         # probability_dict[key] = (0 if not bool(frequency_dict_n_1.get(key_n_1)) else (frequency_dict[key] if bool(frequency_dict.get(key)) else 0) / frequency_dict_n_1[key_n_1])
-        
+
         sentences = df_test['Sentences'].tolist()
 
         # num_cores = multiprocessing.cpu_count()
         # perplexity_scores = Parallel(n_jobs=num_cores)(
-        #     delayed(self.calculate_sentence_perplexity)(sentence, log_probability_dict) 
+        #     delayed(self.calculate_sentence_perplexity)(sentence, log_probability_dict)
         #     for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams')
         # )
 
         perplexity_scores = []
         for sentence in tqdm(sentences, desc=f'Calculating perplexity for {self.n}-grams'):
-            perplexity_scores.append(self.calculate_sentence_perplexity(sentence, log_probability_dict))
+            perplexity_scores.append(self.calculate_sentence_perplexity(
+                sentence, log_probability_dict))
 
-        df = pd.DataFrame({'Comment': sentences, 'Perplexity': perplexity_scores})
+        df = pd.DataFrame(
+            {'Comment': sentences, 'Perplexity': perplexity_scores})
         avg_perplexity = np.mean(perplexity_scores)
 
-        print(f'Average perplexity for {self.n}-grams: {avg_perplexity}')
-        perp_df = pd.read_csv('avg_perplexity.csv')
+        print(
+            f'Average perplexity for {self.n}-grams: {avg_perplexity} with {flag_smooth} smoothing')
+
+        avg_file = 'avg_perplexity_' + flag_smooth + '_smoothing.csv'
+        perp_df = pd.read_csv(avg_file)
         perp_df.loc[self.n-1, 'Average Perplexity'] = avg_perplexity
-        perp_df.to_csv('avg_perplexity.csv', index=False)
+        perp_df.to_csv(avg_file, index=False)
 
         df.to_csv(save_csv, index=False)
-        print(f'Saved {self.n}-gram perplexities to {save_csv}')
+        print(
+            f'Saved {self.n}-gram perplexities with {flag_smooth} smoothing to {save_csv}')
         return df
+
+    def __populate_turning(self):
+        self.frequency_of_frequency = {}
+        
+        for key in self.frequency_dict.keys():
+            if self.frequency_dict[key] not in self.frequency_of_frequency:
+                self.frequency_of_frequency[self.frequency_dict[key]] = 1
+            else:
+                self.frequency_of_frequency[self.frequency_dict[key]] += 1
+
+        self.frequency_of_frequency[0] = (
+            self.vocab_size ** (self.n)) - len(self.frequency_dict.keys())
+
+        self.turing_frequency_dict = {}
+
+        for key in self.frequency_dict.keys():
+            count = self.frequency_dict[key]
+            freq_count = self.frequency_of_frequency[count]
+
+            if count + 1 in self.frequency_of_frequency:
+                freq_count_plus = self.frequency_of_frequency[count + 1]
+            else:
+                freq_count_plus = 0
+
+            self.turing_frequency_dict[key] = (
+                (count + 1) * freq_count_plus) / freq_count
+
+    def __get_vocab_size(self):
+        words_set = set()
+        for sentence in self.df_train['Sentences']:
+            words = sentence.split()
+            for word in words:
+                words_set.add(word)
+
+        return len(words_set)-2
