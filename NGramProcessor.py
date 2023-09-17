@@ -70,8 +70,8 @@ class NGramProcessor:
         self.frequency_dict_size = sum(self.frequency_dict.values())
         if(self.n != 1):
             self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
-
-    def compute_log_probability(self, key, smoothing=None):
+    
+    def compute_log_probability(self, key, smoothing=None, k=1):
         """Function to compute the log probability of an n-gram
 
         Args:
@@ -83,19 +83,19 @@ class NGramProcessor:
 
         if smoothing == "laplace" or smoothing == "additive":
             if self.n == 1:
-                if bool(self.laplace_frequency_dict.get(key)):
-                    return key, np.log2(self.laplace_frequency_dict[key]) - np.log2(sum(self.frequency_dict.values()))
+                if bool(self.frequency_dict.get(key)):
+                    return key, np.log2(self.frequency_dict[key] + k) - np.log2(sum(self.frequency_dict.values()) + k*self.vocab_size)
                 else:
-                    return key, self.unseen_probability
+                    return key, np.log2(k) - np.log2(sum(self.frequency_dict.values()) + k*self.vocab_size)
             else:
                 key_n_1 = ' '.join(key.split()[:self.n - 1])
                 if bool(self.frequency_dict_n_1.get(key_n_1)):
-                    if bool(self.laplace_frequency_dict.get(key)):
-                        return key, np.log2(self.laplace_frequency_dict[key]) - np.log2(self.frequency_dict_n_1[key_n_1])
+                    if bool(self.frequency_dict.get(key)):
+                        return key, np.log2(self.frequency_dict[key] + k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
                     else:
-                        return key, np.log2(self.k) - np.log2(self.frequency_dict_n_1[key_n_1] + self.k*self.vocab_size)
+                        return key, np.log2(k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
                 else:
-                    return key, np.log2(self.k) - np.log2(self.k*self.vocab_size)
+                    return key, -np.log2(self.vocab_size)
 
 
         elif smoothing == "turing":
@@ -173,9 +173,7 @@ class NGramProcessor:
             self.ngrams, args=(self.n,))
         ngrams = ngrams_series.explode().tolist()
 
-        self.k = k
-        save_csv_dir_path = perplexity_csv[:-
-                                           len(perplexity_csv.split('/')[-1])-1]
+        save_csv_dir_path = perplexity_csv[:-len(perplexity_csv.split('/')[-1])-1]
         if save_csv_dir_path != '':
             os.makedirs(save_csv_dir_path, exist_ok=True)
 
@@ -188,16 +186,12 @@ class NGramProcessor:
 
         if smoothing == "turing":
             self.__populate_turning()
-        # elif smoothing == "laplace":
-        #     self.__laplace_smoothing()
-        # elif smoothing == "additive":
-        #     self.__laplace_smoothing(k)
         elif smoothing is None:
             log_prob_save_csv = None
 
         for key in tqdm(list(set(ngrams)), desc=f'Finding log probability for {self.n}-grams with {smoothing} smoothing'):
             probability_results.append(
-                self.compute_log_probability(key, smoothing=smoothing))
+                self.compute_log_probability(key, smoothing=smoothing, k=k))
 
         log_probability_dict = dict(probability_results)
 
@@ -234,7 +228,7 @@ class NGramProcessor:
         # if avg file does not exist, create it
         if not os.path.exists(avg_file):
             temp_df = pd.DataFrame(
-                {'n': ["Unigram", "Bigram", "Trigram", "Quadgram"], 'Average Perplexity': [0, 0, 0, 0]})
+                {'n': ["Unigram", "Bigram", "Trigram", "Quadgram", "5-gram", "6-gram", "7-gram"], 'Average Perplexity': [0, 0, 0, 0, 0, 0, 0]})
             temp_df.to_csv(avg_file, index=False)
 
         perp_df = pd.read_csv(avg_file)
@@ -272,30 +266,6 @@ class NGramProcessor:
             self.turing_frequency_dict[key] = (
                 (count + 1) * freq_count_plus) / freq_count
 
-    def __laplace_smoothing(self, k=1):
-        """
-        This applies laplace smoothing to the n-grams
-        """
-        self.vocab_size = self.__get_vocab_size()
-        self.laplace_frequency_dict = {}
-        N = sum(self.frequency_dict.values())
-
-        # if train:
-        for key in tqdm(self.frequency_dict.keys(), desc=f'Finding probability for {self.n}-grams'):
-            if self.n == 1:
-                self.laplace_frequency_dict[key] = (
-                    (self.frequency_dict[key] + k*1)*N) / (N + k*self.vocab_size)
-            else:
-                key_n_1 = ' '.join(key.split()[:self.n - 1])
-                self.laplace_frequency_dict[key] = ((self.frequency_dict[key] + k*1)*self.frequency_dict_n_1[key_n_1]) / (
-                    self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
-
-        if self.n == 1:
-            self.unseen_probability = np.log2(
-                k) - np.log2(N + k*self.vocab_size)
-        else:
-            self.unseen_probability = np.log2(
-                k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
     def __get_vocab_size(self):
         words_set = set()
