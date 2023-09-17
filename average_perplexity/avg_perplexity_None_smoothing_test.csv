@@ -1,5 +1,5 @@
 n,Average Perplexity
 Unigram,inf
-Bigram,inf
-Trigram,inf
-Quadgram,inf
+Bigram,0.0
+Trigram,0.0
+Quadgram,0.0

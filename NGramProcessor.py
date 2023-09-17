@@ -70,7 +70,7 @@ class NGramProcessor:
         self.frequency_dict_size = sum(self.frequency_dict.values())
         if(self.n != 1):
             self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
-    
+
     def compute_log_probability(self, key, smoothing=None, k=1):
         """Function to compute the log probability of an n-gram
 
@@ -96,7 +96,6 @@ class NGramProcessor:
                         return key, np.log2(k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
                 else:
                     return key, -np.log2(self.vocab_size)
-
 
         elif smoothing == "turing":
             updated_frequency_dict = self.turing_frequency_dict
@@ -173,14 +172,10 @@ class NGramProcessor:
             self.ngrams, args=(self.n,))
         ngrams = ngrams_series.explode().tolist()
 
-        save_csv_dir_path = perplexity_csv[:-len(perplexity_csv.split('/')[-1])-1]
+        save_csv_dir_path = perplexity_csv[:-
+                                           len(perplexity_csv.split('/')[-1])-1]
         if save_csv_dir_path != '':
             os.makedirs(save_csv_dir_path, exist_ok=True)
-
-        # num_cores = multiprocessing.cpu_count()
-        # probability_results = Parallel(n_jobs=num_cores)(
-        #     delayed(self.compute_probability)(key) for key in tqdm(list(set(ngrams)), desc=f'Finding probability for {self.n}-grams')
-        # )
 
         probability_results = []
 
@@ -221,14 +216,20 @@ class NGramProcessor:
             f'Average perplexity for {self.n}-grams: {avg_perplexity} with {smoothing} smoothing')
 
         if df_test.equals(self.df_train):
-            avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_train.csv'
+            if k == 1:
+                avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_train.csv'
+            else:
+                avg_file = f'average_perplexity/avg_perplexity_{smoothing}_{k}_smoothing_train.csv'
         else:
-            avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_test.csv'
+            if k == 1:
+                avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_test.csv'
+            else:
+                avg_file = f'average_perplexity/avg_perplexity_{smoothing}_{k}_smoothing_test.csv'
 
         # if avg file does not exist, create it
         if not os.path.exists(avg_file):
             temp_df = pd.DataFrame(
-                {'n': ["Unigram", "Bigram", "Trigram", "Quadgram", "5-gram", "6-gram", "7-gram"], 'Average Perplexity': [0, 0, 0, 0, 0, 0, 0]})
+                {'n': ["Unigram", "Bigram", "Trigram", "Quadgram"], 'Average Perplexity': [0, 0, 0, 0]})
             temp_df.to_csv(avg_file, index=False)
 
         perp_df = pd.read_csv(avg_file)
@@ -265,7 +266,6 @@ class NGramProcessor:
 
             self.turing_frequency_dict[key] = (
                 (count + 1) * freq_count_plus) / freq_count
-
 
     def __get_vocab_size(self):
         words_set = set()
