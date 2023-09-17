@@ -11,7 +11,7 @@ tqdm.pandas()
 # nltk.download('punkt')
 # nltk.download('stopwords')
 
-df = pd.read_csv('raw_reddit_data_filtered.csv')
+df = pd.read_csv('dataset/raw_reddit_data_filtered.csv')
 # Create a multiprocessing manager to create a shared list
 # manager = multiprocessing.Manager()
 # sentence_list = manager.list()
@@ -29,7 +29,9 @@ def preprocess_comment(comment):
         sentence = re.sub(link_pattern, '', sentence)
         sentence = re.sub(special_character_pattern, '', sentence)
         sentence = sentence.replace('x000D', '')
+        sentence = sentence.replace('x200B', '')
         sentence = sentence.strip()
+        sentence = sentence.lower()
 
         # words = word_tokenize(sentence)
         
@@ -61,5 +63,5 @@ processed_comments = Parallel(n_jobs=num_cores)(delayed(preprocess_comment)(comm
 
 processed_comments = [item for sublist in processed_comments for item in sublist]
 sentence_df = pd.DataFrame(processed_comments, columns=['Sentences'])
-sentence_df.to_csv('sentences.csv', index=False)
-print('Saved sentences to sentences.csv')
+sentence_df.to_csv('dataset/sentences.csv', index=False)
+print('Saved sentences to dataset/sentences.csv')
