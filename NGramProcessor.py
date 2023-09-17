@@ -160,11 +160,11 @@ class NGramProcessor:
         perplexity = 2 ** (-total_log_prob / len(ngrams_of_sentence))
         return perplexity
 
-    def calc_perplexity(self, df_test, smoothing=None, save_csv='sample.csv', log_prob_save_csv='logprob.csv', k=1):
+    def calc_perplexity(self, df_test, smoothing=None, perplexity_csv='perplexity.csv', log_prob_save_csv='logprob.csv', k=1):
         """Function to find the probability of n-grams
 
         Args:
-            save_csv (str, optional): Path to save the csv file. Defaults to 'sample.csv'.
+            perplexity_csv (str, optional): Path to save the csv file. Defaults to 'sample.csv'.
 
         Returns:
             pd.DataFrame: Dataframe containing the n-grams and their probabilities
@@ -174,7 +174,7 @@ class NGramProcessor:
         ngrams = ngrams_series.explode().tolist()
 
         self.k = k
-        save_csv_dir_path = save_csv[:-len(save_csv.split('/')[-1])-1]
+        save_csv_dir_path = perplexity_csv[:-len(perplexity_csv.split('/')[-1])-1]
         if save_csv_dir_path != '':
             os.makedirs(save_csv_dir_path, exist_ok=True)
 
@@ -239,9 +239,9 @@ class NGramProcessor:
         perp_df.loc[self.n-1, 'Average Perplexity'] = avg_perplexity
         perp_df.to_csv(avg_file, index=False)
 
-        df.to_csv(save_csv, index=False)
+        df.to_csv(perplexity_csv, index=False)
         print(
-            f'Saved {self.n}-gram perplexities with {smoothing} smoothing to {save_csv}')
+            f'Saved {self.n}-gram perplexities with {smoothing} smoothing to {perplexity_csv}')
         return df
 
     def __populate_turning(self):
