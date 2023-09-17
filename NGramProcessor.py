@@ -70,7 +70,7 @@ class NGramProcessor:
         self.frequency_dict_size = sum(self.frequency_dict.values())
         if(self.n != 1):
             self.frequency_dict_n_1 = self.create_frequency_dict(self.n-1)
-    
+
     def compute_log_probability(self, key, smoothing=None):
         """Function to compute the log probability of an n-gram
 
@@ -174,7 +174,8 @@ class NGramProcessor:
         ngrams = ngrams_series.explode().tolist()
 
         self.k = k
-        save_csv_dir_path = perplexity_csv[:-len(perplexity_csv.split('/')[-1])-1]
+        save_csv_dir_path = perplexity_csv[:-
+                                           len(perplexity_csv.split('/')[-1])-1]
         if save_csv_dir_path != '':
             os.makedirs(save_csv_dir_path, exist_ok=True)
 
@@ -187,10 +188,10 @@ class NGramProcessor:
 
         if smoothing == "turing":
             self.__populate_turning()
-        elif smoothing == "laplace":
-            self.__laplace_smoothing()
-        elif smoothing == "additive":
-            self.__laplace_smoothing(k)
+        # elif smoothing == "laplace":
+        #     self.__laplace_smoothing()
+        # elif smoothing == "additive":
+        #     self.__laplace_smoothing(k)
         elif smoothing is None:
             log_prob_save_csv = None
 
@@ -202,10 +203,12 @@ class NGramProcessor:
 
         # save the log probability dict
         if log_prob_save_csv is not None:
-            log_prob_save_csv_dir_path = log_prob_save_csv[:-len(log_prob_save_csv.split('/')[-1])-1]
+            log_prob_save_csv_dir_path = log_prob_save_csv[:-len(
+                log_prob_save_csv.split('/')[-1])-1]
             if log_prob_save_csv_dir_path != '':
                 os.makedirs(log_prob_save_csv_dir_path, exist_ok=True)
-            df = pd.DataFrame(list(log_probability_dict.items()), columns=['Comment', 'Log Probability'])
+            df = pd.DataFrame(list(log_probability_dict.items()), columns=[
+                              'Comment', 'Log Probability'])
             df.to_csv(log_prob_save_csv, index=False)
             print(f'Saved {self.n}-gram probabilities to {log_prob_save_csv}')
 
@@ -222,7 +225,6 @@ class NGramProcessor:
 
         print(
             f'Average perplexity for {self.n}-grams: {avg_perplexity} with {smoothing} smoothing')
-
 
         if df_test.equals(self.df_train):
             avg_file = f'average_perplexity/avg_perplexity_{smoothing}_smoothing_train.csv'
@@ -289,10 +291,11 @@ class NGramProcessor:
                     self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
         if self.n == 1:
-            self.unseen_probability = np.log2(k) - np.log2(N + k*self.vocab_size)
+            self.unseen_probability = np.log2(
+                k) - np.log2(N + k*self.vocab_size)
         else:
-            self.unseen_probability = np.log2(k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
-
+            self.unseen_probability = np.log2(
+                k) - np.log2(self.frequency_dict_n_1[key_n_1] + k*self.vocab_size)
 
     def __get_vocab_size(self):
         words_set = set()

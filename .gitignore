@@ -2,7 +2,4 @@ language_models/*
 !language_models/
 Smoothing.py
 earlier_results/*
-avg_perplexity_laplace_smoothing_test.csv 
-avg_perplexity_laplace_smoothing_train.csv 
-avg_perplexity_None_smoothing_train.csv
 n_grams_train_2.py
