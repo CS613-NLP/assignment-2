@@ -29,4 +29,4 @@ The repository contains the following python files. Their descriptions are as fo
 
 ## Usage
 
-Usage can be found in point 5 of the [documentation](https://github.com/CS613-NLP/assignment-2/Tasks_and_Results).
+Usage can be found in point 5 of the [documentation](Tasks_and_Results.pdf).
