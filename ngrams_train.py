@@ -25,7 +25,7 @@ else:
     n_gram = f"{n}-gram"
 
 
-ngram = NGramProcessor(df_train, 4)
+ngram = NGramProcessor(df_train, n)
 ngram.train()
 ngram.calc_perplexity(df_train, perplexity_csv=f'perplexities/no_smoothing/perplexity_{n_gram}_train.csv',
                          log_prob_save_csv=f'language_models/no_smoothing/{n_gram}_train.csv')
