@@ -76,9 +76,11 @@ class NGramProcessor:
 
         Args:
             key (str): n-gram
+            smoothing (str, optional): Type of smoothing to be used. Defaults to None.
+            k (int, optional): Value of k for additive smoothing. Defaults to 1 -> Laplace Smoothing.
 
         Returns:
-            Tuple: Tuple containing the n-gram and its log probability
+            Tuple: Tuple containing the n-gram (key) and its log probability
         """
 
         if smoothing == "laplace" or smoothing == "additive":
@@ -152,6 +154,16 @@ class NGramProcessor:
         return df
 
     def calculate_sentence_perplexity(self, sentence, log_probability_dict):
+        """
+            Function to calculate the perplexity of a sentence
+
+            Args:
+                sentence (str): Sentence for which perplexity is to be calculated
+                log_probability_dict (dict): Dictionary containing the log probabilities of n-grams
+
+            Returns:
+                float: Perplexity of the sentence
+        """
         ngrams_of_sentence = self.ngrams(sentence, self.n)
         total_log_prob = 0
         for ngram_set in ngrams_of_sentence:
@@ -163,7 +175,10 @@ class NGramProcessor:
         """Function to find the probability of n-grams
 
         Args:
-            perplexity_csv (str, optional): Path to save the csv file. Defaults to 'sample.csv'.
+            df_test (pd.DataFrame): Preprocessed test dataset
+            smoothing (str, optional): Type of smoothing to be used. Defaults to None.
+            perplexity_csv (str, optional): Path to save the csv file containing perplexities of the word. Defaults to 'sample.csv'.
+            log_prob_save_csv (str, optional): Path to save the log probability of each word in a csv file. Defaults to 'logprob.csv'.
 
         Returns:
             pd.DataFrame: Dataframe containing the n-grams and their probabilities
@@ -242,6 +257,9 @@ class NGramProcessor:
         return df
 
     def __populate_turning(self):
+        """
+            Function to populate the frequency of frequency dictionary for turing smoothing
+        """
         self.frequency_of_frequency = {}
 
         for key in self.frequency_dict.keys():
@@ -268,6 +286,10 @@ class NGramProcessor:
                 (count + 1) * freq_count_plus) / freq_count
 
     def __get_vocab_size(self):
+        """
+            Function to get the vocabulary size i.e. the number of unique words in the dataset.
+            
+        """
         words_set = set()
         for sentence in self.df_train['Sentences']:
             words = sentence.split()
