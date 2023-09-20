@@ -12,7 +12,7 @@ Repository for the Assignment 2 of course CS613, Natural Language Processing on 
 
 ## About
 
-In this Assignment, we had to train n-gram models from unigram to quadgram on the dataset provided. We had to implemenent different smoothing techniques and compare the preplexities of the models.
+In this Assignment, we had to train n-gram models from unigram to quadgram on the dataset provided. We had to implemenent different smoothing techniques and compare the preplexities of the models. Details of each task can be found here - [documentation](Tasks_and_Results.pdf)
 
 ## File Structure
 The repository contains the following folders. Their descriptions are as follows:
